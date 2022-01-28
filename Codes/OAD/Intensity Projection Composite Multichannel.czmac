@@ -1,0 +1,108 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<Script>
+  <Context>Zen26</Context>
+  <Version>1.0</Version>
+  <Language>Python</Language>
+  <Text>#######################################################
+## I M A G E   P R O C E S S I N G
+##
+## Macro name: Intensity Projection Composite Multichannel
+##
+## Author name: ZSPANIYA@APAC Digital Solutions
+##
+## TAKES THE OUTPUT Z-STACK IMAGE OF AN EXPERIMENT
+## SUBSET THE CHANNELS AND CREATE A PROJECTION IN EACH CHANNEL
+## COMBINE THE CHANNEL OUTPUTS TO FORM THE FINAL PROJECTION IMAGE
+##
+## Copyright (c) 2020 by Carl Zeiss Microscopy GmbH.
+## Permission is granted to use, modify and distribute this code,
+## as long as this copyright notice remains part of the code.
+#######################################################
+##
+##
+## Clear all messages in the macro-editor
+Zen.Application.MacroEditor.ClearMessages()
+##
+## Apply the macro only if the image output of the experiment is the active document
+if(Zen.Application.Documents.ActiveDocument.IsZenImage == True):
+    ##
+    ## Set the experiment output stack as the active document for the macro
+    image = Zen.Application.Documents.ActiveDocument 
+    ##
+    ## Get the number of channels in the image
+    num_channels = image.Bounds.SizeC 
+    ##
+    ## Get the number of images in the stack  
+    if image.Bounds.IsZStack:
+        num_stack_images = image.Bounds.SizeZ 
+    else:
+        num_stack_images = 1
+    ##
+    ## Initialize the output image
+    dstImage = ZenImage() 
+    ##
+    ## Extended Depth of Focus settings to be applied on Brightfield channels (this code uses EDF with wavelets)
+    processingsetting1 = Zen.Processing.Filter.Settings.EDFSetting() 
+    processingsetting1.Method = ZenExtendedFocusMethod.Wavelets
+    processingsetting1.WaveletSetting.ZStackAlignment = ZenAlignmentQuality.NoAlignment
+    ##
+    ## Applying appropriate projections for each channel image subsets - EDF for Brightfield channels and Maximum Intensity Projection for Fluorescence channels
+    for j in range (1,num_channels+1):
+        ##
+        ## Get channel name from image metadata
+        channel_name = image.Metadata.GetChannelName(j-1)
+        ##
+        ## Create channel image subset for each iteration
+        channel_img = image.CreateSubImage('C(' + str(j) + ')') 
+        ##
+        ## Find the contrast method used in the channel image subset for each iteration
+        channel_contrast = channel_img.Metadata.ContrastMethod 
+        ##
+        ## Print channel number, channel name and contrast method for each channel
+        print j,channel_name,channel_contrast
+        ##
+        ## For Fluorescence (Non-Brightfield) channels, perform Maximum Intensity Projection
+        if channel_contrast == 'Fluorescence': 
+            print 'Fluorescence channel'
+            image_projn = Zen.Processing.Transformation.Geometric.OrthoView(channel_img, ZenViewDirection.Frontal, 0, num_stack_images, ZenProjectionMethod.Maximum, False, False)# Maximum intensity projection of channel 1 (GFP) subset image
+        ##
+        ## For Brightfield channels, perform Extended Depth of Focus (this code uses EDF with wavelets)
+        else: 
+            print 'Brightfield channel'
+            image_projn = Zen.Processing.Filter.Sharpen.EDF(channel_img, processingsetting1) # EDF of channel Brightfield channel subset images
+                       
+        dstImage=Zen.Processing.Utilities.AddChannels(dstImage, image_projn) # Combining the two channels back into output projection image
+   
+         
+    ids = dstImage.DisplaySetting.GetAllChannelIds() # Display Setting
+    for id in ids:
+       dstImage.DisplaySetting.SetParameter(id,'IsAutoApplyEnabled',True)
+     
+    Zen.Application.Documents.Add(dstImage)
+    ##
+    ## Switch to Split View
+    imageViews = Zen.Application.DocumentViews.Find(dstImage)
+    imageViews.ActiveViewType = ZenDocumentView.ImageSplit
+    ##
+    ## Save image
+    ## Zen.Application.Save(dstImage, r'C:\OAD\Output\CZI Images\ProjectedOutput.czi') # Save the output image in the specified folder automatically.
+##
+## Print error if the active document after the experiment is not an image
+else:
+    print "Error"
+    ## Show Error message window
+    strMessage = 'Error - An input image expected!'
+    Zen.Application.Pause(strMessage)
+
+#######################################################
+
+
+
+
+</Text>
+  <Author></Author>
+  <Description></Description>
+  <Keywords></Keywords>
+  <Row>64</Row>
+  <Column>104</Column>
+</Script>
